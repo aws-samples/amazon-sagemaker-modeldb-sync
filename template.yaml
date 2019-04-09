@@ -1,0 +1,261 @@
+ # Copyright 2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ #
+ # Permission is hereby granted, free of charge, to any person obtaining a copy of this
+ # software and associated documentation files (the "Software"), to deal in the Software
+ # without restriction, including without limitation the rights to use, copy, modify,
+ # merge, publish, distribute, sublicense, and/or sell copies of the Software, and to
+ # permit persons to whom the Software is furnished to do so.
+ #
+ # THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,
+ # INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
+ # PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+ # HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+ # OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+ # SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+ 
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+    amazon-sagemaker-modeldb-connector
+
+    Registers model information to a ModelDB instance in response to SageMaker training job events.
+
+Parameters:
+    ModelDBInstanceUrl:
+        Description: ModelDB Instance Url for Light API Calls
+        Default: modeldb.example.com
+        Type: String
+    ModelDBInstancePort:
+        Description: ModelDB Instance Port for Light API Calls
+        Default: 6543
+        Type: String
+    TagModelDBSync:
+        Description: Name of Tag to look at for synchronizing models to ModelDB. (Looks for true in Tag Value)
+        Default: MODEL_DB_SYNC
+        Type: String
+    TagModelDBProjectName:
+        Description: Name of Tag to look at for Project Name.
+        Default: MODEL_DB_PROJECT_NAME
+        Type: String    
+    TagModelDBProjectUser:
+        Description: Name of Tag to look at for Project User.
+        Default: MODEL_DB_PROJECT_USER
+        Type: String      
+    TagModelDBProjectDesc:
+        Description: Name of Tag to look at for Project Description.
+        Default: MODEL_DB_PROJECT_DESC
+        Type: String      
+    TagModelDBModelName:
+        Description: Name of Tag to look at for Model Name.
+        Default: MODEL_DB_MODEL_NAME
+        Type: String      
+    TagModelDBModelType:
+        Description: Name of Tag to look at for Model Type.
+        Default: MODEL_DB_MODEL_TYPE
+        Type: String      
+
+Metadata:
+  AWS::CloudFormation::Interface: 
+    ParameterGroups: 
+      - 
+        Label: 
+          default: "ModelDB"
+        Parameters: 
+          - ModelDBInstanceUrl
+          - ModelDBInstancePort
+      - 
+        Label: 
+          default: "Tags"
+        Parameters: 
+          - TagModelDBSync
+          - TagModelDBProjectName
+          - TagModelDBProjectUser
+          - TagModelDBProjectDesc
+          - TagModelDBModelName
+          - TagModelDBModelType
+
+Resources:
+
+    # - CloudWatch Events Rules ----------------------------------------
+
+    EventRule: 
+        Type: AWS::Events::Rule
+        Properties: 
+            Description: "EventRule"
+            EventPattern: 
+                source: 
+                    - "aws.sagemaker"
+                detail-type: 
+                    - "SageMaker Training Job State Change"
+            State: "ENABLED"
+            Targets: 
+                - 
+                    Arn: 
+                        Fn::GetAtt: 
+                            - "StepFunctionTriggerFunction"
+                            - "Arn"
+                    Id: "StepFunctionTriggerFunctionV1"
+    
+    PermissionForEventsToInvokeLambda: 
+        Type: AWS::Lambda::Permission
+        Properties: 
+            FunctionName: 
+                Ref: "StepFunctionTriggerFunction"
+            Action: "lambda:InvokeFunction"
+            Principal: "events.amazonaws.com"
+            SourceArn: 
+                Fn::GetAtt: 
+                    - "EventRule"
+                    - "Arn"
+
+    # -- Lambda IAM Roles ----------------------------------------
+
+    StepFunctionTriggerFunctionRole:
+      Type: "AWS::IAM::Role"
+      Properties:
+        AssumeRolePolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Principal:
+                  Service: lambda.amazonaws.com
+                Action: "sts:AssumeRole"
+        Policies:
+          - PolicyName: StepFunctionTriggerFunctionRolePolicy
+            PolicyDocument:
+                Version: "2012-10-17"
+                Statement:
+                  - Effect: Allow
+                    Action:
+                      - "states:StartExecution"
+                      - "logs:*"
+                    Resource: "*"
+
+    GetTrainingJobDetailsFunctionRole:
+      Type: "AWS::IAM::Role"
+      Properties:
+        AssumeRolePolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Principal:
+                  Service: lambda.amazonaws.com
+                Action: "sts:AssumeRole"
+        Policies:
+          - PolicyName: StepFunctionTriggerFunctionRolePolicy
+            PolicyDocument:
+                Version: "2012-10-17"
+                Statement:
+                  - Effect: Allow
+                    Action:
+                      - "sagemaker:DescribeTrainingJob"
+                      - "logs:*"
+                    Resource: "*"
+
+    RegisterModelWithModelDBFunctionRole:
+      Type: "AWS::IAM::Role"
+      Properties:
+        AssumeRolePolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Principal:
+                  Service: lambda.amazonaws.com
+                Action: "sts:AssumeRole"
+        Policies:
+          - PolicyName: StepFunctionTriggerFunctionRolePolicy
+            PolicyDocument:
+                Version: "2012-10-17"
+                Statement:
+                  - Effect: Allow
+                    Action:
+                      - "logs:*"
+                    Resource: "*"
+
+    # -- Lambda Functions ----------------------------------------
+
+    StepFunctionTriggerFunction:
+        Type: AWS::Serverless::Function 
+        Properties:
+            CodeUri: functions/step_function_trigger/
+            Handler: app.lambda_handler
+            Role: !GetAtt [ StepFunctionTriggerFunctionRole, Arn ]
+            Runtime: python3.7
+            Environment:
+                Variables:
+                    STATE_MACHINE_ARN: !Ref ModelRegistrationStateMachine
+
+    GetTrainingJobDetailsFunction:
+        Type: AWS::Serverless::Function 
+        Properties:
+            CodeUri: functions/get_training_job_details/
+            Handler: app.lambda_handler
+            Role: !GetAtt [ GetTrainingJobDetailsFunctionRole, Arn ]
+            Runtime: python3.7
+
+    RegisterModelWithModelDBFunction:
+        Type: AWS::Serverless::Function 
+        Properties:
+            CodeUri: functions/register_model_with_modeldb/
+            Handler: app.lambda_handler
+            Role: !GetAtt [ RegisterModelWithModelDBFunctionRole, Arn ]
+            Runtime: python3.7
+            MemorySize: 2048
+            Timeout: 60            
+            Environment:
+                Variables:
+                    MODEL_DB_INSTANCE_URL: !Ref ModelDBInstanceUrl
+                    MODEL_DB_INSTANCE_PORT: !Ref ModelDBInstancePort
+
+    # -- State Machine ----------------------------------------
+
+    ModelRegistrationStateMachineRole:
+        Type: "AWS::IAM::Role"
+        Properties:
+            AssumeRolePolicyDocument:
+                Version: "2012-10-17"
+                Statement:
+                    - Effect: "Allow"
+                      Principal:
+                        Service:
+                            - !Sub states.${AWS::Region}.amazonaws.com
+                      Action: "sts:AssumeRole"
+            Path: "/"
+            Policies:
+                - PolicyName: StatesExecutionPolicy
+                  PolicyDocument:
+                    Version: "2012-10-17"
+                    Statement:
+                        - Effect: Allow
+                          Action:
+                            - "lambda:InvokeFunction"
+                          Resource: "*"
+
+    ModelRegistrationStateMachine:
+        Type: "AWS::StepFunctions::StateMachine"
+        Properties:
+            DefinitionString:
+                !Sub
+                    - |-
+                        {
+                          "Comment": "A state machine that registers models trained in SageMaker with a ModelDB instance.",
+                          "StartAt": "GetTrainingJobDetails",
+                          "States": {                        
+                            "GetTrainingJobDetails": {
+                              "Type": "Task",
+                              "Resource": "${getTrainingJobDetailsFunctionArn}",
+                              "ResultPath": "$.data",
+                              "Next": "RegisterModelWithModelDB"
+                            },                    
+                            "RegisterModelWithModelDB": {
+                              "Type": "Task",
+                              "Resource": "${registerModelWithModelDBFunctionArn}",
+                              "ResultPath": "$.data",
+                              "End": true
+                            }                            
+                          }
+                        }
+                    - { getTrainingJobDetailsFunctionArn: !GetAtt [ GetTrainingJobDetailsFunction, Arn ],
+                        registerModelWithModelDBFunctionArn: !GetAtt [ RegisterModelWithModelDBFunction, Arn]
+                      }
+            RoleArn: !GetAtt [ ModelRegistrationStateMachineRole, Arn ]
