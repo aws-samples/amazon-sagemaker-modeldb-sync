@@ -16,9 +16,9 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
 Description: >
-    amazon-sagemaker-modeldb-connector
+    amazon-sagemaker-modeldb-sync
 
-    Registers model information to a ModelDB instance in response to SageMaker training job events.
+    Synchronizes model information to a ModelDB instance in response to SageMaker training job events.
 
 Parameters:
     ModelDBInstanceUrl:
@@ -131,6 +131,26 @@ Resources:
                       - "logs:*"
                     Resource: "*"
 
+    ValidateTrainingJobTagsFunctionRole:
+      Type: "AWS::IAM::Role"
+      Properties:
+        AssumeRolePolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Principal:
+                  Service: lambda.amazonaws.com
+                Action: "sts:AssumeRole"
+        Policies:
+          - PolicyName: ValidateTrainingJobTagsFunctionRolePolicy
+            PolicyDocument:
+                Version: "2012-10-17"
+                Statement:
+                  - Effect: Allow
+                    Action:
+                      - "logs:*"
+                    Resource: "*"
+
     GetTrainingJobDetailsFunctionRole:
       Type: "AWS::IAM::Role"
       Properties:
@@ -142,7 +162,7 @@ Resources:
                   Service: lambda.amazonaws.com
                 Action: "sts:AssumeRole"
         Policies:
-          - PolicyName: StepFunctionTriggerFunctionRolePolicy
+          - PolicyName: GetTrainingJobDetailsFunctionRolePolicy
             PolicyDocument:
                 Version: "2012-10-17"
                 Statement:
@@ -152,7 +172,7 @@ Resources:
                       - "logs:*"
                     Resource: "*"
 
-    RegisterModelWithModelDBFunctionRole:
+    SyncModelWithModelDBFunctionRole:
       Type: "AWS::IAM::Role"
       Properties:
         AssumeRolePolicyDocument:
@@ -163,7 +183,7 @@ Resources:
                   Service: lambda.amazonaws.com
                 Action: "sts:AssumeRole"
         Policies:
-          - PolicyName: StepFunctionTriggerFunctionRolePolicy
+          - PolicyName: SyncModelWithModelDBFunctionRolePolicy
             PolicyDocument:
                 Version: "2012-10-17"
                 Statement:
@@ -174,6 +194,7 @@ Resources:
 
     # -- Lambda Functions ----------------------------------------
 
+    # Step Function Trigger 
     StepFunctionTriggerFunction:
         Type: AWS::Serverless::Function 
         Properties:
@@ -183,7 +204,9 @@ Resources:
             Runtime: python3.7
             Environment:
                 Variables:
-                    STATE_MACHINE_ARN: !Ref ModelRegistrationStateMachine
+                    STATE_MACHINE_ARN: !Ref ModelSyncStateMachine
+
+    # Step Function Activities
 
     GetTrainingJobDetailsFunction:
         Type: AWS::Serverless::Function 
@@ -193,12 +216,28 @@ Resources:
             Role: !GetAtt [ GetTrainingJobDetailsFunctionRole, Arn ]
             Runtime: python3.7
 
-    RegisterModelWithModelDBFunction:
+    ValidateTrainingJobTagsFunction:
         Type: AWS::Serverless::Function 
         Properties:
-            CodeUri: functions/register_model_with_modeldb/
+            CodeUri: functions/validate_training_job_tags/
             Handler: app.lambda_handler
-            Role: !GetAtt [ RegisterModelWithModelDBFunctionRole, Arn ]
+            Role: !GetAtt [ ValidateTrainingJobTagsFunctionRole, Arn ]
+            Runtime: python3.7
+            Environment:
+                Variables:
+                    TAG_MODEL_DB_SYNC: !Ref TagModelDBSync 
+                    TAG_MODEL_DB_PROJECT_NAME: !Ref TagModelDBProjectName
+                    TAG_MODEL_DB_PROJECT_USER: !Ref TagModelDBProjectUser
+                    TAG_MODEL_DB_PROJECT_DESC: !Ref TagModelDBProjectDesc
+                    TAG_MODEL_DB_MODEL_NAME: !Ref TagModelDBModelName
+                    TAG_MODEL_DB_MODEL_TYPE: !Ref TagModelDBModelType
+
+    SyncModelWithModelDBFunction:
+        Type: AWS::Serverless::Function 
+        Properties:
+            CodeUri: functions/sync_model_with_modeldb/
+            Handler: app.lambda_handler
+            Role: !GetAtt [ SyncModelWithModelDBFunctionRole, Arn ]
             Runtime: python3.7
             MemorySize: 2048
             Timeout: 60            
@@ -209,7 +248,7 @@ Resources:
 
     # -- State Machine ----------------------------------------
 
-    ModelRegistrationStateMachineRole:
+    ModelSyncStateMachineRole:
         Type: "AWS::IAM::Role"
         Properties:
             AssumeRolePolicyDocument:
@@ -231,31 +270,59 @@ Resources:
                             - "lambda:InvokeFunction"
                           Resource: "*"
 
-    ModelRegistrationStateMachine:
+    ModelSyncStateMachine:
         Type: "AWS::StepFunctions::StateMachine"
         Properties:
             DefinitionString:
                 !Sub
                     - |-
                         {
-                          "Comment": "A state machine that registers models trained in SageMaker with a ModelDB instance.",
-                          "StartAt": "GetTrainingJobDetails",
-                          "States": {                        
+                          "Comment": "A state machine that synchronizes models trained in SageMaker with a ModelDB instance.",
+                          "StartAt": "ValidateTrainingJobTags",
+                          "States": {  
+                            "ValidateTrainingJobTags": {
+                              "Type": "Task",
+                              "Resource": "${validateTrainingJobTagsFunctionArn}",
+                              "ResultPath": "$.data",
+                              "Next": "CheckValidationResult"
+                            },
+                            "CheckValidationResult": {
+                              "Type": "Choice",
+                              "Choices": [
+                                {
+                                  "Variable": "$.data.trainingJobTagValidation",
+                                  "StringEquals": "FAILED",
+                                  "Next": "ValidationFailed"
+                                },
+                                {
+                                  "Variable": "$.data.trainingJobTagValidation",
+                                  "StringEquals": "PASSED",
+                                  "Next": "GetTrainingJobDetails"
+                                }
+                              ],
+                              "Default": "ValidationFailed"
+                            },                           
+                            "ValidationFailed": {
+                              "Type": "Fail",
+                              "Cause": "Training Job Tag Validation Failed",
+                              "Error": "ValidateTrainingJobTags returned FAILED"
+                            },                                                     
                             "GetTrainingJobDetails": {
                               "Type": "Task",
                               "Resource": "${getTrainingJobDetailsFunctionArn}",
                               "ResultPath": "$.data",
-                              "Next": "RegisterModelWithModelDB"
+                              "Next": "SyncModelWithModelDB"
                             },                    
-                            "RegisterModelWithModelDB": {
+                            "SyncModelWithModelDB": {
                               "Type": "Task",
-                              "Resource": "${registerModelWithModelDBFunctionArn}",
+                              "Resource": "${syncModelWithModelDBFunctionArn}",
                               "ResultPath": "$.data",
                               "End": true
                             }                            
                           }
                         }
                     - { getTrainingJobDetailsFunctionArn: !GetAtt [ GetTrainingJobDetailsFunction, Arn ],
-                        registerModelWithModelDBFunctionArn: !GetAtt [ RegisterModelWithModelDBFunction, Arn]
+                        validateTrainingJobTagsFunctionArn: !GetAtt [ ValidateTrainingJobTagsFunction, Arn],
+                        syncModelWithModelDBFunctionArn: !GetAtt [ SyncModelWithModelDBFunction, Arn]
                       }
-            RoleArn: !GetAtt [ ModelRegistrationStateMachineRole, Arn ]
+            RoleArn: !GetAtt [ ModelSyncStateMachineRole, Arn ]

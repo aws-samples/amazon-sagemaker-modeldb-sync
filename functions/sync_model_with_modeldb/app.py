@@ -63,14 +63,29 @@ def syncToModelDB(projectName, projectUser, projectDesc, modelName, modelType, t
         message = 'Error Synchronizing Model to Model DB: {}'.format(e)
         raise Exception(message) 
 
+def getTagValue(tagToGet, tagNames, trainingJobTags):
+    for tag in tagNames:
+        if tag['Name'] == tagToGet:
+            if tag['Value']:
+                return trainingJobTags[tag['Value']]
+            else:
+                return 'Default'
+
 def lambda_handler(event, context):
     print(event)
 
     modeldbInstanceUrl = os.environ['MODEL_DB_INSTANCE_URL']
     modeldbInstancePort = os.environ['MODEL_DB_INSTANCE_PORT']
 
-    trainingJobDetails = json.loads(event['data']['trainingJobDetails'])
+    tagNames = event['data']['tagNames']
+    trainingJobTags = event['data']['trainingJobTags']
 
-    print(trainingJobDetails)
+    projectName = getTagValue('TAG_MODEL_DB_PROJECT_NAME', tagNames, trainingJobTags)
+    projectUser = getTagValue('TAG_MODEL_DB_PROJECT_USER', tagNames, trainingJobTags)
+    projectDesc = getTagValue('TAG_MODEL_DB_PROJECT_DESC', tagNames, trainingJobTags)
+    modelName = getTagValue('TAG_MODEL_DB_MODEL_NAME', tagNames, trainingJobTags)
+    modelType = getTagValue('TAG_MODEL_DB_MODEL_TYPE', tagNames, trainingJobTags)
     
-    syncToModelDB('Sample Project', 'Example User', 'This is a sample project.', 'testmodel', 'NN', trainingJobDetails, modeldbInstanceUrl, modeldbInstancePort)
+    trainingJobDetails = json.loads(event['data']['trainingJobDetails'])
+    
+    syncToModelDB(projectName, projectUser, projectDesc, modelName, modelType, trainingJobDetails, modeldbInstanceUrl, modeldbInstancePort)

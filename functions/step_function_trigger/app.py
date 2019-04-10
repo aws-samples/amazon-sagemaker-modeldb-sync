@@ -29,7 +29,7 @@ def lambda_handler(event, context):
             'waitTime': 60
         }
 
-        print('Training Job Completed - Triggering ModelDB Registration Workflow for: {}'.format(executionInput))
+        print('Training Job Completed - Triggering ModelDB Synchronization Workflow for: {}'.format(executionInput))
 
         stateMachineArn = os.environ['STATE_MACHINE_ARN']
        
