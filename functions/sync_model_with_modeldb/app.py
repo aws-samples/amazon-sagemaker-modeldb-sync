@@ -80,6 +80,7 @@ def lambda_handler(event, context):
     tagNames = event['data']['tagNames']
     trainingJobTags = event['data']['trainingJobTags']
 
+    # Load Training Job Tag Values for Import into ModelDB
     projectName = getTagValue('TAG_MODEL_DB_PROJECT_NAME', tagNames, trainingJobTags)
     projectUser = getTagValue('TAG_MODEL_DB_PROJECT_USER', tagNames, trainingJobTags)
     projectDesc = getTagValue('TAG_MODEL_DB_PROJECT_DESC', tagNames, trainingJobTags)

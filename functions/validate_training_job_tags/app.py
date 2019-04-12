@@ -22,6 +22,8 @@ def validateTags(tagNames, trainingJobTags):
     passedValidation = []
     failedValidation = []
 
+    # Validate Tags Exist by enumerating Training Job Tags, Matching to Configured Tag Names, and Looking for Values
+    # Note: Could be extended to perform additional validatation on Tag Value (ie: regex)
     for tag in tagNames:
         if tag['Value'] in trainingJobTags:
             print('Tag {} Exists in Training Job Tags'.format(tag['Value']))

@@ -19,7 +19,7 @@ from datetime import date, datetime
 
 client = boto3.client('sagemaker')
 
-# JSON Serializer for Metric TimeStamps
+# JSON Serializer for TimeStamps
 def jsonSerial(obj):
     if isinstance(obj, (datetime, date)):
         return obj.isoformat()

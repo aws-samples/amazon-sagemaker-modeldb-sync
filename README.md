@@ -4,11 +4,11 @@
 
 ## Overview
 
-This sample deploys a simple event-based architecture to synchronize SageMaker Training Jobs to ModelDB with the ModelDB Light API. To synchronize your training jobs to ModelDB, you simply need to perform the following.
+This sample deploys a simple event-based architecture to synchronize SageMaker model metadata to ModelDB with the ModelDB Light API. The synchronization will be triggered when SageMaker Training Jobs complete. A Step Function will be executed to validate certain tags that are applied to training jobs, gather details about the trained model, and synchronize those details to a ModelDB instance using the ModelDB Light API. This solution can be extended to synchronize any data that's supported by the Light API, or used as a pattern for synchronizing to other model metadata management systems.
 
 ### Limitations
 
-* Expects a publically accessible ModelDB instance. This is acceptable for some testing but you may want to consider deploying your ModelDB instance within a VPC, and updating the template.yaml file to configure the SyncModelWithModelDBFunction Lambda Function to use this VPC. You could also further configure the Lambda Function code to utilize any authentication mechanisms you've implemented as part of your ModelDB deployment.
+* Expects a publically accessible ModelDB instance. This is acceptable for some testing but you may want to consider deploying your ModelDB instance within a VPC and updating the template.yaml file to configure the SyncModelWithModelDBFunction Lambda Function to use this VPC. You could also further configure the Lambda Function code to utilize any authentication mechanisms you've implemented as part of your ModelDB deployment.
 * Currently supports ModelDB V1. The ModelDB project has announced that ModelDB V2 is comming soon, and once released this project may need to be updated to support V2 depending on any changes made to the Light API.
 * Only some details from the SageMaker DescribeTrainingJob API call are synchronized to ModelDB. You can extend this solution to include additional data as required, using this solution as a starting point for your synchronization workflow.
 
@@ -26,7 +26,7 @@ This sample deploys a simple event-based architecture to synchronize SageMaker T
 
 ### Getting Sarted
 * Deploy this solution into the AWS Account where you are conducting SageMaker Training. When you deploy the solution you will need to provide the following parameters.
-    * ModelDB Instance and Port to synchronize with.
+    * ModelDB Instance and Port to synchronize with (varies based on how you deploy ModelDB).
 
 ### Tag Detail
 
@@ -36,7 +36,7 @@ As you create SageMaker Training Jobs, include the folllowing tags, as they will
 
 #### Tags
 
-All of the following tags must exist in your Training Job in order for the sync to be successful. If you don't want a training job to be syncronized you can ommit the MODEL_DB_SYNC key while continuing to tag training jobs with other metadata. This is useful if you are reusing existing keys and want to indendently control flagging some training jobs to sync, and others to not sync.
+All of the following tags must exist in your Training Job in order for the sync to be successful. If you don't want a training job to be syncronized you can ommit the MODEL_DB_SYNC key while continuing to tag training jobs with other metadata. This is useful if you are reusing existing tag keys and want to indendently control flagging some training jobs to sync, and others to not sync.
 
     * Key: MODEL_DB_SYNC Value: [Any Value Accepted]
     * Key: MODEL_DB_PROJECT_NAME Value: [Project Name]
