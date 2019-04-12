@@ -24,6 +24,12 @@ This sample deploys a simple event-based architecture to synchronize SageMaker m
 * SageMaker Training Job Metrics (train/test)
 * SageMaker Training Job Output Model Location
 
+### Step Function
+
+The following diagram shows the Step Function that is executed to synchronize model metadata with Model DB. This step function is triggered by a Amazon SageMaker CloudWatch Event Rule w/ a Lambda target that triggers the Step Function.
+
+![Alt text](docs/stepfunction.png?raw=true "Diagram")
+
 ### Getting Sarted
 * Deploy this solution into the AWS Account where you are conducting SageMaker Training. When you deploy the solution you will need to provide the following parameters.
     * ModelDB Instance and Port to synchronize with (varies based on how you deploy ModelDB).
