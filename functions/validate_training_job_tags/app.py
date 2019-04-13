@@ -16,7 +16,7 @@
 import json
 import os
 
-def validateTags(tagNames, trainingJobTags):
+def validate_tags(tagNames, trainingJobTags):
     print('Validating the Existance of {} in {}'.format(tagNames, trainingJobTags))
     
     passedValidation = []
@@ -44,6 +44,7 @@ def lambda_handler(event, context):
     trainingJobName = event['trainingJobName']
     trainingJobTags = event['trainingJobTags']
 
+    # Map Tag Names to CF Parameters 
     tagNames = [
         {
             'Name': 'TAG_MODEL_DB_SYNC',
@@ -72,7 +73,8 @@ def lambda_handler(event, context):
     ]
  
     try:
-        validationResult = validateTags(tagNames, trainingJobTags)
+        # Perform Validation
+        validationResult = validate_tags(tagNames, trainingJobTags)
 
         return {
             'trainingJobName': trainingJobName,

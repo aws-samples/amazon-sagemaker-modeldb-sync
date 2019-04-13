@@ -20,7 +20,7 @@ from datetime import date, datetime
 client = boto3.client('sagemaker')
 
 # JSON Serializer for TimeStamps
-def jsonSerial(obj):
+def json_serial(obj):
     if isinstance(obj, (datetime, date)):
         return obj.isoformat()
     raise TypeError ("Type %s not serializable." % type(obj))
@@ -40,7 +40,7 @@ def lambda_handler(event, context):
             'trainingJobName': trainingJobName,
             'tagNames': tagNames,
             'trainingJobTags': trainingJobTags,
-            'trainingJobDetails': json.dumps(response, default=jsonSerial)
+            'trainingJobDetails': json.dumps(response, default=json_serial)
         }  
 
     except Exception as e:

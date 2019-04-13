@@ -18,7 +18,7 @@ import json
 
 from modeldb.basic.ModelDbSyncerBase import *
 
-def syncToModelDB(projectName, projectUser, projectDesc, modelName, modelType, trainingJobDetails, host, port):
+def sync_to_modeldb(projectName, projectUser, projectDesc, modelName, modelType, trainingJobDetails, host, port):
 
     print('Attempting to Synchronize Model To: {}:{}'.format(host, port))
 
@@ -63,7 +63,8 @@ def syncToModelDB(projectName, projectUser, projectDesc, modelName, modelType, t
         message = 'Error Synchronizing Model to Model DB: {}'.format(e)
         raise Exception(message) 
 
-def getTagValue(tagToGet, tagNames, trainingJobTags):
+def get_tag_value(tagToGet, tagNames, trainingJobTags):
+    # Look Up Tag Values Based on Tag Names Mapping
     for tag in tagNames:
         if tag['Name'] == tagToGet:
             if tag['Value']:
@@ -74,6 +75,7 @@ def getTagValue(tagToGet, tagNames, trainingJobTags):
 def lambda_handler(event, context):
     print(event)
 
+    # Get ModelDB Instance Details
     modeldbInstanceUrl = os.environ['MODEL_DB_INSTANCE_URL']
     modeldbInstancePort = os.environ['MODEL_DB_INSTANCE_PORT']
 
@@ -81,12 +83,14 @@ def lambda_handler(event, context):
     trainingJobTags = event['data']['trainingJobTags']
 
     # Load Training Job Tag Values for Import into ModelDB
-    projectName = getTagValue('TAG_MODEL_DB_PROJECT_NAME', tagNames, trainingJobTags)
-    projectUser = getTagValue('TAG_MODEL_DB_PROJECT_USER', tagNames, trainingJobTags)
-    projectDesc = getTagValue('TAG_MODEL_DB_PROJECT_DESC', tagNames, trainingJobTags)
-    modelName = getTagValue('TAG_MODEL_DB_MODEL_NAME', tagNames, trainingJobTags)
-    modelType = getTagValue('TAG_MODEL_DB_MODEL_TYPE', tagNames, trainingJobTags)
+    projectName = get_tag_value('TAG_MODEL_DB_PROJECT_NAME', tagNames, trainingJobTags)
+    projectUser = get_tag_value('TAG_MODEL_DB_PROJECT_USER', tagNames, trainingJobTags)
+    projectDesc = get_tag_value('TAG_MODEL_DB_PROJECT_DESC', tagNames, trainingJobTags)
+    modelName = get_tag_value('TAG_MODEL_DB_MODEL_NAME', tagNames, trainingJobTags)
+    modelType = get_tag_value('TAG_MODEL_DB_MODEL_TYPE', tagNames, trainingJobTags)
     
+    # Load Training Job Details
     trainingJobDetails = json.loads(event['data']['trainingJobDetails'])
     
-    syncToModelDB(projectName, projectUser, projectDesc, modelName, modelType, trainingJobDetails, modeldbInstanceUrl, modeldbInstancePort)
+    # Perform ModelDB Sync using Light API
+    sync_to_modeldb(projectName, projectUser, projectDesc, modelName, modelType, trainingJobDetails, modeldbInstanceUrl, modeldbInstancePort)
