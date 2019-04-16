@@ -70,11 +70,7 @@ Tag keys are configurable by overriding the CloudFormation parameter correspondi
 2. Configure your local AWS Credentials (aws configure).
 3. Create an S3 bucket to store the packaged code and replace S3_BUCKET_TO_STAGE_CODE with the name of your bucket in the comamands below. 
 
-### Building and Packaging
-
-AWS CLI commands to package, deploy and describe outputs defined within the cloudformation stack:
-
-## Build and Package
+### Build and Package
 
 Repalce the placeholder values in [] with your values and then run this command with a properly configured SAM environment.
 
@@ -86,9 +82,9 @@ sam package \
     --s3-bucket S3_BUCKET_TO_STAGE_CODE
 ```
 
-## Deploy the Stack
+### Deploy the Stack
 
-### Console
+#### Console
 
 1. Logon to the AWS Console
 2. Open the CloudFormation service.
@@ -96,7 +92,7 @@ sam package \
 4. Navigate to the packaged.yaml file stored locally (this package is created with the sam package command and references code artifacts in S3)
 5. Enter the required parameters and launch the stack (you will need to confirm a few more screens, and generate a change-set.).
 
-### CLI
+#### CLI
 
 Repalce the placeholder values in [] with your values and then run this command with a properly configured SAM environment.
 
